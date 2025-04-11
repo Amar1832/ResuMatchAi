@@ -5,9 +5,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-job_desc_path = "C:\\Users\\narne\\OneDrive\\Desktop\\job_description.csv"
-resume_folder = "C:\\Users\\narne\\OneDrive\\Desktop\\CVs1"
-output_csv = "C:\\Users\\narne\\OneDrive\\Desktop\\shortlisted_candidates.csv"
+job_desc_path = "C:\\Users\\avgc9\\OneDrive\\Desktop\\acc dataset 1\\5\\job_description.csv"
+resume_folder = "C:\\Users\\avgc9\\OneDrive\\Desktop\\acc dataset 1\\5\\CVs1"
+output_excel = "D:\\PythonProject\\test3\\shortlisted_candidates.xlsx"
 
 
 df_jobs = pd.read_csv(job_desc_path, encoding='latin1')
@@ -37,7 +37,7 @@ def extract_text_from_pdf(pdf_path):
 def extract_skills(text, keyword_list):
     return " ".join([word for word in keyword_list if word in text])
 
-# Process job descriptions
+
 df_jobs["skills"] = df_jobs["Job Description"].astype(str).str.lower().apply(
     lambda x: extract_skills(x, skill_keywords)
 )
@@ -54,7 +54,7 @@ for filename in os.listdir(resume_folder):
 
 df_resumes = pd.DataFrame(resumes)
 
-# Calculate similarity
+
 vectorizer = TfidfVectorizer()
 job_vectors = vectorizer.fit_transform(df_jobs["skills"])
 resume_vectors = vectorizer.transform(df_resumes["skills"])
@@ -66,7 +66,7 @@ results = []
 for i, resume in enumerate(df_resumes["filename"]):
     for j, job in enumerate(df_jobs["Job Title"]):
         match_score = similarity_scores[i, j] * 100
-        if match_score >= 50:  # Adjust threshold if needed
+        if match_score >= 50:  # Threshold for shortlist
             results.append({
                 "Resume": resume,
                 "Job Title": job,
@@ -74,6 +74,19 @@ for i, resume in enumerate(df_resumes["filename"]):
             })
 
 df_results = pd.DataFrame(results)
-df_results.to_csv(output_csv, index=False)
 
-print(f"✅ Shortlisted candidates saved to: {output_csv}")
+
+df_results.sort_values(by=["Job Title", "Match Score"], ascending=[True, False], inplace=True)
+
+
+df_results["Rank"] = df_results.groupby("Job Title")["Match Score"].rank(method="first", ascending=False).astype(int)
+
+df_results = df_results[["Job Title", "Resume", "Match Score", "Rank"]]
+
+
+with pd.ExcelWriter(output_excel) as writer:
+    for job_title, group in df_results.groupby("Job Title"):
+        clean_title = "".join(c for c in job_title if c.isalnum() or c.isspace()).strip()[:31]
+        group.to_excel(writer, sheet_name=clean_title or "Job", index=False)
+
+print(f"✅ Shortlisted candidates saved to Excel: {output_excel}")

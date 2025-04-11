@@ -1,0 +1,79 @@
+import os
+import pandas as pd
+import PyPDF2
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+job_desc_path = "C:\\Users\\narne\\OneDrive\\Desktop\\job_description.csv"
+resume_folder = "C:\\Users\\narne\\OneDrive\\Desktop\\CVs1"
+output_csv = "C:\\Users\\narne\\OneDrive\\Desktop\\shortlisted_candidates.csv"
+
+
+df_jobs = pd.read_csv(job_desc_path, encoding='latin1')
+
+
+skill_keywords = [
+    "python", "java", "c++", "tensorflow", "pytorch", "aws", "azure", "docker",
+    "kubernetes", "sql", "mysql", "postgresql", "data science", "nlp",
+    "computer vision", "spring boot", "cybersecurity", "risk assessment", "penetration testing"
+]
+
+
+def extract_text_from_pdf(pdf_path):
+    try:
+        text = ""
+        with open(pdf_path, "rb") as f:
+            reader = PyPDF2.PdfReader(f)
+            for page in reader.pages:
+                if page.extract_text():
+                    text += page.extract_text() + " "
+        return text.strip().lower()
+    except Exception as e:
+        print(f"Error reading {pdf_path}: {e}")
+        return ""
+
+
+def extract_skills(text, keyword_list):
+    return " ".join([word for word in keyword_list if word in text])
+
+# Process job descriptions
+df_jobs["skills"] = df_jobs["Job Description"].astype(str).str.lower().apply(
+    lambda x: extract_skills(x, skill_keywords)
+)
+
+
+resumes = []
+for filename in os.listdir(resume_folder):
+    if filename.endswith(".pdf"):
+        file_path = os.path.join(resume_folder, filename)
+        resume_text = extract_text_from_pdf(file_path)
+        if resume_text:
+            extracted_skills = extract_skills(resume_text, skill_keywords)
+            resumes.append({"filename": filename, "skills": extracted_skills})
+
+df_resumes = pd.DataFrame(resumes)
+
+# Calculate similarity
+vectorizer = TfidfVectorizer()
+job_vectors = vectorizer.fit_transform(df_jobs["skills"])
+resume_vectors = vectorizer.transform(df_resumes["skills"])
+
+similarity_scores = cosine_similarity(resume_vectors, job_vectors)
+
+
+results = []
+for i, resume in enumerate(df_resumes["filename"]):
+    for j, job in enumerate(df_jobs["Job Title"]):
+        match_score = similarity_scores[i, j] * 100
+        if match_score >= 50:  # Adjust threshold if needed
+            results.append({
+                "Resume": resume,
+                "Job Title": job,
+                "Match Score": round(match_score, 2)
+            })
+
+df_results = pd.DataFrame(results)
+df_results.to_csv(output_csv, index=False)
+
+print(f"✅ Shortlisted candidates saved to: {output_csv}")

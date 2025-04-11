@@ -1,0 +1,6 @@
+Technologies Used
+Python:	Core programming language
+Pandas:	Data handling & CSV processing
+PyPDF2:	Extracting text from PDF resumes
+Scikit-learn (TF-IDF, Cosine Similarity)	NLP-based text comparison
+CSV Export:	Saving shortlisted candidates
